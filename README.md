@@ -1,1 +1,1 @@
-# Face_recognition
+# Practicing Git
