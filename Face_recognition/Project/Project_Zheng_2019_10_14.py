@@ -5,21 +5,7 @@ import tensorflow as tf
 import skimage.io
 import skimage.transform
 import matplotlib.pyplot as plt
-
-
-def download():     # download tiger and kittycat image
-    categories = ['tiger', 'kittycat']
-    for category in categories:
-        os.makedirs('./For_transfer_learning/data/%s' % category, exist_ok=True)
-        with open('./For_transfer_learning/imagenet_%s.txt' % category, 'r') as file:
-            urls = file.readlines()
-            n_urls = len(urls)
-            for i, url in enumerate(urls):
-                try:
-                    urlretrieve(url.strip(), './For_transfer_learning/data/%s/%s' % (category, url.strip().split('/')[-1]))
-                    print('%s %i/%i' % (category, i, n_urls))
-                except:
-                    print('%s %i/%i' % (category, i, n_urls), 'no image')
+import collections 
 
 
 def load_img(path):
@@ -37,23 +23,24 @@ def load_img(path):
 
 
 def load_data(): # 載入圖片時，把label與圖片的資料存到字典"imgs"裡，label起始值為1
-    imgs = {'no_1': [],
-    'no_2': [],
-    'no_3': [],
-    'no_4': [],
-    'no_5': [],
-    'no_6': [],
-    'no_7': [],
-    'no_8': [],
-    'no_9': [],
-    'no_10': []
-    }
+    imgs = collections.OrderedDict()
+    imgs['no_0'] = []
+    imgs['no_1'] = []
+    imgs['no_2'] = []
+    imgs['no_3'] = []
+    imgs['no_4'] = []
+    imgs['no_5'] = []
+    imgs['no_6'] = []
+    imgs['no_7'] = []
+    imgs['no_8'] = []
+    imgs['no_9'] = []
     count = 0
 
     for  k in imgs.keys(): 
         labels = np.zeros([len(imgs)]) # imgs內有幾個種類就先創造多少個label
         labels[count] = 1 
         dir = './For_transfer_learning/data/' + k
+        print('imgs.keys(): ', k)
         for file in os.listdir(dir):
             if not file.lower().endswith('.jpg'):
                 continue
@@ -66,18 +53,32 @@ def load_data(): # 載入圖片時，把label與圖片的資料存到字典"imgs
             if len(imgs[k]) == 100:        # only use 100 imgs to reduce my memory load
                 break
         count += 1
-    return imgs['no_1'], imgs['no_2'], imgs['no_3'], imgs['no_4'], imgs['no_5'], imgs['no_6'], imgs['no_7'], imgs['no_8'], imgs['no_9'], imgs['no_10']
+    # 每個imgs['no_x']裡面的資料都是(label, resized_img)，共100個
+    return imgs['no_0'], imgs['no_1'], imgs['no_2'], imgs['no_3'], imgs['no_4'], imgs['no_5'], imgs['no_6'], imgs['no_7'], imgs['no_8'], imgs['no_9']
 
 
-def label_split(inputs):
-    label = []
+def label_split(inputs):# 輸入: (label, imgs)， 輸出: 分割輸入資料的labels ,imgs，按照輸入順序排列且type為list
+    labels = []
     imgs = []
     for i in range(0, len(inputs)):
         indices, resized_img = inputs[i]
-        label.append(indices)
+        labels.append(indices)
         imgs.append(resized_img)
-    return label,imgs
+    return labels, imgs # 返回labels = [label1, lable2, ...], imgs = [resized_img1, resized_img2, ....] 都是list
 
+
+
+def file2img(input):# 輸入: 資料夾路徑， 輸出: 該資料夾內所有檔案路徑，type為np.ndarray
+    i = 0 
+    for file in os.listdir(input):
+        img_path = os.path.join(input, file)
+        if i == 0:
+            output = load_img(img_path)
+            i = 1
+        else:
+            output = np.concatenate((output, load_img(img_path)), axis = 0)
+    print('\n shape of test_data:', output.shape) 
+    return output
 
 
 class Vgg16:
@@ -101,46 +102,57 @@ class Vgg16:
             red - self.vgg_mean[2],
         ])
 
+
+        
         # pre-trained VGG layers are fixed in fine-tune
         conv1_1 = self.conv_layer(bgr, "conv1_1")
         conv1_2 = self.conv_layer(conv1_1, "conv1_2")
         pool1 = self.max_pool(conv1_2, 'pool1')
 
+
         conv2_1 = self.conv_layer(pool1, "conv2_1")
         conv2_2 = self.conv_layer(conv2_1, "conv2_2")
         pool2 = self.max_pool(conv2_2, 'pool2')
+
 
         conv3_1 = self.conv_layer(pool2, "conv3_1")
         conv3_2 = self.conv_layer(conv3_1, "conv3_2")
         conv3_3 = self.conv_layer(conv3_2, "conv3_3")
         pool3 = self.max_pool(conv3_3, 'pool3')
 
+
         conv4_1 = self.conv_layer(pool3, "conv4_1")
         conv4_2 = self.conv_layer(conv4_1, "conv4_2")
         conv4_3 = self.conv_layer(conv4_2, "conv4_3")
         pool4 = self.max_pool(conv4_3, 'pool4')
+
 
         conv5_1 = self.conv_layer(pool4, "conv5_1")
         conv5_2 = self.conv_layer(conv5_1, "conv5_2")
         conv5_3 = self.conv_layer(conv5_2, "conv5_3")
         pool5 = self.max_pool(conv5_3, 'pool5')
 
+
         # detach original VGG fc layers and
         # reconstruct your own fc layers serve for your own purpose
-        self.flatten = tf.reshape(pool5, [-1, 7*7*512])
+        self.flatten = tf.reshape(pool5, [-1, 7*7*512]) # self.flatten.shape (?, 25088)
+
         self.fc6 = tf.layers.dense(self.flatten, 256, tf.nn.relu, name='fc6')
         self.out = tf.layers.dense(self.fc6, 10, name='out') # 種類變多這裡要改
+        self.test_out = tf.nn.softmax(self.out)
+
 
         self.sess = tf.Session()
         if restore_from:
             saver = tf.train.Saver()
             saver.restore(self.sess, restore_from)
         else:   # training graph
-            self.prediction = tf.nn.softmax(self.out)
-            self.loss = tf.reduce_mean(-tf.reduce_sum(self.tfy * tf.log(self.prediction)))
+            # self.prediction = tf.nn.softmax(self.out)
+            # self.loss = tf.reduce_mean(-tf.reduce_sum(self.tfy * tf.log(self.prediction)))
+
+            self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits = self.out, labels = self.tfy ))
             self.train_op = tf.train.AdamOptimizer(1e-4).minimize(self.loss)
-            # self.loss = tf.losses.mean_squared_error(labels=self.tfy, predictions=self.out)
-            # self.train_op = tf.train.RMSPropOptimizer(0.001).minimize(self.loss)
+            # self.train_op = tf.train.GradientDescentOptimizer(0.5).minimize(self.loss)
             self.sess.run(tf.global_variables_initializer())
 
     def max_pool(self, bottom, name):
@@ -154,28 +166,32 @@ class Vgg16:
 
     def train(self, x, y):
         loss, _ = self.sess.run([self.loss, self.train_op], {self.tfx: x, self.tfy: y})
+
         return loss
 
     def predict(self, paths, labels):#paths, labels = list
-        label = labels[0]
-        test_x = load_img(paths) #np.ndarray
-        test_y = np.zeros((1,labels[1]))
+        # 取得並處理測試資料的labels
+        label = labels[0]# 取得實際輸入的label
+        test_y = np.zeros((1,labels[1]))# 創造一排大小為(1, 總label數)的全0矩陣
         test_y[0,label] = 1 # type(test_y): ndarray
+        
+        # 取得測試資料的路徑
+        test_x = file2img(paths)# type(test_x) <class 'numpy.ndarray'>,  test_x.shape (資料夾內照片的數量, 224, 224, 3)
 
-        pre_x = self.sess.run(self.out, feed_dict = {self.tfx: test_x})
-        print('pre_x:' ,pre_x)
+        pre_x = self.sess.run(self.test_out, feed_dict = {self.tfx: test_x})
+        print('pre_x:' ,pre_x)# 印出預測每個label的機率
+        print('tf.argmax(pre_x)):', self.sess.run(tf.argmax(pre_x,1))) # 印出模型預測的label
+        print('tf.argmax(test_y):', self.sess.run(tf.argmax(test_y,1)))# 印出實際輸入的label
 
-        print('tf.argmax(pre_x)):', self.sess.run(tf.argmax(pre_x,1)))
-        print('tf.argmax(test_y):', self.sess.run(tf.argmax(test_y,1)))
         correct_predcition = tf.equal(tf.argmax(pre_x,1), tf.argmax(test_y,1))# type(tf.argmax(pre_x,1)): ndarray
-        print('correct_prediction:', self.sess.run(correct_predcition))
+        print('correct_prediction:', self.sess.run(correct_predcition))# 印出模型預測與實際輸入的比對結果
         
         accuracy = tf.reduce_mean(tf.cast(correct_predcition, tf.float32))
-        print('accuracy:', self.sess.run(accuracy))
+        print('accuracy:', self.sess.run(accuracy))# 印出正確率
 
         result = self.sess.run(accuracy, feed_dict = {self.tfx: test_x})
         print('result: ', result)
-        return(result)
+
 
 
     def save(self, path='./For_transfer_learning/model/transfer_learn'):
@@ -184,9 +200,10 @@ class Vgg16:
 
 
 def train():
-    no_1, no_2, no_3, no_4, no_5, no_6, no_7, no_8, no_9, no_10 = load_data()
-    # print('no_1:', type(no_1[0][0]),type(no_1[0][1]))
+    no_0, no_1, no_2, no_3, no_4, no_5, no_6, no_7, no_8, no_9 = load_data()
 
+
+    label_0, no0_x = label_split(no_0)
     label_1, no1_x = label_split(no_1)
     label_2, no2_x = label_split(no_2)
     label_3, no3_x = label_split(no_3)
@@ -196,19 +213,20 @@ def train():
     label_7, no7_x = label_split(no_7)
     label_8, no8_x = label_split(no_8)
     label_9, no9_x = label_split(no_9)
-    label_10, no10_x = label_split(no_10)
+    #label, no 都是list
 
-    xs = np.concatenate(no1_x + no2_x + no3_x + no4_x + no5_x + no6_x + no7_x + no8_x + no9_x + no10_x, axis = 0)
-    ys = np.concatenate((label_1, label_2, label_2, label_2, label_3, label_4, label_5, label_6, label_7, label_8, label_9, label_10), axis = 0)
-
+    xs = np.concatenate(no0_x + no1_x + no2_x + no3_x + no4_x + no5_x + no6_x + no7_x + no8_x + no9_x, axis = 0)# 會變成(resized_img1, resized_img2, ...),shape:(?,)
+    ys = np.concatenate((label_0, label_1, label_2, label_2, label_2, label_3, label_4, label_5, label_6, label_7, label_8, label_9), axis = 0)# 會變成([0,0,0,1,0,0,0,0,0,0],[0,0,1,0,0,0,0,0,0,0]...),shape:(?,10)
+    #xs, ys 都是np.ndarray
     vgg = Vgg16(vgg16_npy_path='./For_transfer_learning/vgg16.npy')
     print('Net built')
     
     for i in range(1001):
-        b_idx = np.random.randint(0, len(xs), 6)
+        b_idx = np.random.randint(0, len(xs), 10)
         train_loss = vgg.train(xs[b_idx], ys[b_idx])
         if i % 100 == 0:
             print(i, 'train loss: ', train_loss)
+
 
     vgg.save('./For_transfer_learning/model/transfer_learn')      # save learned fc layers
 
@@ -216,11 +234,13 @@ def train():
 def eval():
     vgg = Vgg16(vgg16_npy_path='./For_transfer_learning/vgg16.npy',
                 restore_from='./For_transfer_learning/model/transfer_learn')
+
+    # labels[x,y], x: 第0~9號, y: 總共幾種
     vgg.predict(
-        './For_transfer_learning/data/test_no_1/0506_01.jpg', labels = [4,10]) # labels[x,y], x:第幾種，從零開始, y總共幾種
+        './For_transfer_learning/data/test_no_1', labels = [1,10]) 
+        
 
 
 if __name__ == '__main__':
-    # download()
-    train()
-    # eval()
+    # train()
+    eval()

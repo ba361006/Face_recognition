@@ -6,13 +6,15 @@ mnist = input_data.read_data_sets('MNIST_data', one_hot = True)
 def compute_accuracy(v_xs, v_ys):
     global prediction
     y_pre = sess.run(prediction, feed_dict = {xs: v_xs, keep_prob: 1})
-    print('y_pre[0]:', y_pre[0])
+
+
+    # print('y_pre[0]:', y_pre[0])
     # print('type(y_pre):', type(y_pre))
     correct_prediction = tf.equal(tf.argmax(y_pre,1),tf.argmax(v_ys,1))
-    print('correct_prediction:', sess.run(correct_prediction))
+    # print('correct_prediction:', sess.run(correct_prediction))
     
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-    print('accuracy:', sess.run(accuracy))
+    # print('accuracy:', sess.run(accuracy))
 
     result = sess.run(accuracy, feed_dict = {xs:v_xs, ys:v_ys, keep_prob:1})
     return result
@@ -79,6 +81,8 @@ W_fc2 = weight_variable([1024, 10])
 b_fc2 = bias_variable([10])
 prediction = tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 
+# prediction = tf.matmul(h_fc1_drop, W_fc2) + b_fc2
+# cross_entropy = tf.reduce_sum(tf.nn.softmax_cross_entropy_with_logits(logits = prediction, labels = ys))
 
 cross_entropy = tf.reduce_mean(-tf.reduce_sum(ys * tf.log(prediction),
                                               reduction_indices=[1]))       # loss
@@ -96,6 +100,9 @@ with tf.Session() as sess:
             print("i= ", i, compute_accuracy(
                 mnist.test.images[:1000], mnist.test.labels[:1000]
             ))
+            print('prediction', sess.run(prediction,feed_dict={xs: batch_xs, ys: batch_ys, keep_prob: 0.5}))
+            print('batch_xs.shape', batch_xs.shape)
+            # print('loss = ', sess.run(train_step, feed_dict={xs: batch_xs, ys: batch_ys, keep_prob: 0.5}))
         # if i % 100 == 0:
             # print('batch_ys:',batch_ys)
             # print('type(batch_ys:)',type(batch_ys))# numpy.ndarray
