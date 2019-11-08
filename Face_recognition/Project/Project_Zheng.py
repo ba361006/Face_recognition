@@ -373,8 +373,8 @@ def train():
             print('### steps: %s, loss: %s ###'% (k, train_loss))
 
     train_end = time.time()
-
-    print('\n### The spending time of training is %s ###\n' % (train_end - train_start))
+    print('\n### Finish training ###\n')
+    print('### The spending time of training is %s ###\n' % (train_end - train_start))
     vgg.save('./Project/Transfer_learning/model/transfer_learn') 
 
 
@@ -403,20 +403,9 @@ if __name__ == '__main__':
     
     # capture(force_in, mode = 0, waitkey = 25, number = 40)# train模式
     # train()
-    # capture(Test_path, mode = 1, waitkey = 50, number = 33)# test模式
+    capture(Test_path, mode = 1, waitkey = 50, number = 33)# test模式
     eval()
 
-# 嘗試加上dropout
-# 把照片丟進去後，去算33次裡面other的機率必須小於10%才過
-# drop 0.8, 1e-5, 1001, 共六種人, 正確率分別為 24% 21% 66% 54% 87% 90% 81%c
-# drop 0.6, 1e-5, 1001, 共六種人, 訓練182秒, 正確率分別為 100% 100% 100% 93% 100% 100% 100%
-# drop 0.6, 1e-5, 501, 共六種人, 訓練93秒, 正確率分別為 100% 100% 100% 96% 100% 90% 96%
-# drop 0.5, 1e-5, 501, 共六種人, 訓練96秒, 正確率分別為 100% 100% 100% 87% 100% 100% 87%
-# drop 0.6, 1e-5, 601, 共六種人, 訓練114秒, 正確率分別為 100% 100% 100% 100% 100% 100% (100% 100% 93% 100% 100%)
-
-# 1.自動創建以姓名為名字的資料夾
-# 2.還是用no_0為資料夾的名字，但是要讓使用者姓名與輸入順序掛勾
-# 希望能做到取得使用者姓名→拍照→創建以使用者為名字的資料夾（有重複的就刪掉，沒有重複的就創造，設置清除除了我與承憲以外檔案的按鈕）
 ### steps: 0, loss: 19.270834 ###
 ### steps: 100, loss: 3.1447527 ###
 ### steps: 200, loss: 1.020499 ###
@@ -427,5 +416,3 @@ if __name__ == '__main__':
 
 ### The spending time of training is 113.5130386352539 ###
 
-# 0 100%, 1 100%,2 93%,3 100%, 4 100%,6 96%, 7 100%
-# Debug_沒有讀到圖片或是沒開攝影機: cv2.error: OpenCV(3.4.1) C:\Miniconda3\conda-bld\opencv-suite_1533128839831\work\modules\imgproc\src\color.cpp:11147: error: (-215) scn == 3 || scn == 4 in function cv::cvtColor
