@@ -1,4 +1,5 @@
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras import regularizers
 import os
 import numpy as np
 import tensorflow as tf
@@ -14,9 +15,9 @@ force_in = './Project/Reinforcement/'
 train_data_path = './Project/Train_data/'
 train_batch = 10
 keep_rate = 0.5
-train_learning_rate = 1e-5
+train_learning_rate = 5e-4
 sample_steps = 100
-train_steps = 701 # 預設為601 若要改則自行在此修改
+train_steps = 501 # 預設為601 若要改則自行在此修改
 
 category = len(os.listdir(train_data_path)) # 種類
 Test_path = './Project/Test_data/test_data/' # 測試資料夾路徑、要加雙引號
@@ -138,7 +139,7 @@ def capture_training_data(user_name, output_path = force_in, waitkey = 25, numbe
                 print('\n### Taking %s picture ###' % (num_0))
 
                 if num_0 == (number - 1):
-                    print('\n### Finishing Capturing ###\n')
+                    print('\n### Finish Capturing ###\n')
                     reinforcement(force_in, Train_path, user_name, 5)
             cap.release()
             cv2.destroyAllWindows()
@@ -184,7 +185,7 @@ def capture_testing_data(output_path = Test_path, waitkey = 50, number = 33):
                 cv2.imwrite(output_path + 'face_' + str(num_1) + '.jpg', img) #按照儲存順序命名檔案
                 print('\n### Taking %s picture ###' %(num_1))
                 if num_1 == (number - 1):
-                    print('\n### Finishing Capturing ###\n')
+                    print('\n### Finish Capturing ###\n')
             cap.release()
             cv2.destroyAllWindows()
             break
@@ -235,10 +236,23 @@ def show_result(name, accuracy):
     cv2.destroyAllWindows()
 
 
+# def mean_var_with_update(fc_mean, fc_var, ema):
+#     ema_apply_op = ema.apply([fc_mean, fc_var])
+#     with tf.control_dependencies([ema_apply_op]):
+#         return tf.identity(fc_mean), tf.identity(fc_var)
+
+# def BN(input, input_shape):
+#     fc_mean, fc_var = tf.nn.moments(input, axes = [1])
+#     ema = tf.train.ExponentialMovingAverage(decay = 0.5)
+#     mean, var = mean_var_with_update(fc_mean, fc_var, ema)# var & mean shape: (64,)
+#     scale = tf.Variable(tf.ones([input_shape]))# 讓scale的shape與var, mean一樣
+#     shift = tf.Variable(tf.zeros([input_shape]))# 讓shift的shape與var, mean一樣
+#     epsilon = 0.001
+#     BN = tf.nn.batch_normalization(input, mean, var, shift, scale, epsilon)
 
 class Vgg16:
     vgg_mean = [103.939, 116.779, 123.68]
-
+    
     def __init__(self, vgg16_npy_path=None, restore_from=None):
         # pre-trained parameters
         try:
@@ -257,7 +271,7 @@ class Vgg16:
             red - self.vgg_mean[2],
         ])
 
-
+        self.conv_count = 0
         
         # pre-trained VGG layers are fixed in fine-tune
         conv1_1 = self.conv_layer(bgr, "conv1_1")
@@ -292,10 +306,13 @@ class Vgg16:
         # reconstruct your own fc layers serve for your own purpose
         self.flatten = tf.reshape(pool5, [-1, 7*7*512]) # self.flatten.shape (?, 25088)# 圖片大小 112 112 3 → 4*4*512 ; 224 224 3 → 7*7*512
 
-        self.fc6 = tf.layers.dense(self.flatten, 256, tf.nn.relu, name='fc6')
-        self.drop = tf.nn.dropout(self.fc6, self.keep_prob, name = 'drop')
-        self.out = tf.layers.dense(self.drop, category, name='out') #  種類
-        self.test_out = tf.nn.softmax(self.out)
+        self.fc6 = tf.layers.dense(self.flatten, 256, tf.nn.relu, kernel_regularizer=regularizers.l2(0.01), activity_regularizer=regularizers.l1(0.01) , name='fc6')
+        self.drop_1 = tf.nn.dropout(self.fc6, self.keep_prob, name = 'drop_1')
+        self.out = tf.layers.dense(self.drop_1, category,kernel_regularizer=regularizers.l2(0.01), activity_regularizer=regularizers.l1(0.01), name='out') #  種類
+        self.drop_2 = tf.nn.dropout(self.out, self.keep_prob, name = 'drop_2')
+        
+
+        self.test_out = tf.nn.softmax(self.drop_2)
 
 
         self.sess = tf.Session()
@@ -310,10 +327,28 @@ class Vgg16:
     def max_pool(self, bottom, name):
         return tf.nn.max_pool(bottom, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
 
+
+
     def conv_layer(self, bottom, name):
         with tf.variable_scope(name):   # CNN's filter is constant, NOT Variable that can be trained
+            # print('\n##### self.conv_count: ', self.conv_count)
             conv = tf.nn.conv2d(bottom, self.data_dict[name][0], [1, 1, 1, 1], padding='SAME')
+
+            # if self.conv_count < 2 :
+            #     print('\n##### into BN, self.conv_count: ', self.conv_count)
+            #     fc_mean, fc_var = tf.nn.moments(conv, axes = [0, 1, 2],)
+            #     ema = tf.train.ExponentialMovingAverage(decay = 0.5)
+            #     mean, var = mean_var_with_update(fc_mean, fc_var, ema)# var & mean shape: (64,)
+            #     scale = tf.Variable(tf.ones([mean.shape[0]]))# 讓scale的shape與var, mean一樣
+            #     shift = tf.Variable(tf.zeros([mean.shape[0]]))# 讓shift的shape與var, mean一樣
+            #     epsilon = 0.001
+            #     BN = tf.nn.batch_normalization(conv, mean, var, shift, scale, epsilon)
+            #     lout = tf.nn.relu(tf.nn.bias_add(BN, self.data_dict[name][1]))
+
+            # else:
             lout = tf.nn.relu(tf.nn.bias_add(conv, self.data_dict[name][1]))
+
+            # self.conv_count += 1
             return lout
 
     def train(self, x, y):
@@ -348,7 +383,7 @@ class Vgg16:
     def compute_accuracy(self, xs, ys):
         pre_x = self.sess.run(self.test_out, feed_dict = {self.tfx: xs, self.keep_prob: 1})
         pre_label = self.sess.run(tf.argmax(pre_x,1))
-        print('\n#### pre_label: %s, tf.argmax(ys,1): %s' %(pre_label, self.sess.run(tf.argmax(ys,1))))
+        print('\n#### pre_label: %s, true_label: %s' %(pre_label, self.sess.run(tf.argmax(ys,1))))
 
         correct_prediction = tf.equal(pre_label, self.sess.run(tf.argmax(ys,1)))
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
@@ -371,7 +406,6 @@ def train():
     
     train_start = time.time()
     for k in range(train_steps):
-        
         random_idx= np.random.randint(0, (sample_steps * category), train_batch)
         count = 0
         for i in random_idx:
@@ -387,10 +421,9 @@ def train():
                 ys = np.concatenate((ys, labels[content][remaindor]), axis = 0)# np.ndarray(10,10)
             
         train_loss = vgg.train(xs, ys)
-        
         if k % sample_steps == 0:
+            print('### steps: %s, loss: %s ###'% (k, train_loss))  
             print(vgg.compute_accuracy(xs,ys))
-            print('### steps: %s, loss: %s ###'% (k, train_loss))
             
     train_end = time.time()
     print('\n### Finish training ###\n')
