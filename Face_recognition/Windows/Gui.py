@@ -1,27 +1,29 @@
 import tkinter as tk
-import Project_Zheng_Code as pj 
+import Main as pj 
 import os 
 import shutil
 from tkinter.font import Font
 from tkinter import ttk
 
-# capture(force_in, mode = 0, waitkey = 25, number = 40)# train模式
-# train()
-# capture(Test_path, mode = 1, waitkey = 50, number = 33)# test模式
-# eval()
 
 def Ok():
-    pj.ok(name_entry.get())
+    if name_entry.get() == '':
+        print('Error, please enter your name')
+    else:
+        pj.ok(name_entry.get())
 
 def Capture_training_data():
-    pj.capture_training_data(user_name = name_entry.get())
+    if name_entry.get() == '':
+        print('Error, please enter your name')
+    else:
+        pj.capture_training_data(user_name = name_entry.get())
 
 def Train():
     pj.train()
 
 def Capture_testing_data():
     pj.capture_testing_data()
-
+ 
 def Test():
     pj.eval()
 
@@ -52,7 +54,7 @@ header_label = tk.Label(window, bg='#323232', fg='white',font = ft_title, text='
 header_label.pack(side = tk.TOP, pady = 20)
 
 
-# name群組
+# name
 name_frame = tk.Frame(window, bg='#323232')
 name_frame.pack(side = tk.TOP)
 
@@ -66,7 +68,7 @@ name_ok = tk.Button(name_frame, font = ft_article, command = Ok, text = 'Ok')
 name_ok.pack(side = tk.LEFT, padx = 5)
 
 
-# train群組
+# train
 train_frame = tk.Frame(window, bg='#323232')
 train_frame.pack(side = tk.TOP, pady = 20)
 
@@ -80,7 +82,7 @@ train = tk.Button(train_frame, font = ft_article, command = Train, text = 'Train
 train.pack(side = tk.LEFT, padx = 15)
 
 
-# test群組
+# test
 test_frame = tk.Frame(window, bg = '#323232')
 test_frame.pack(side = tk.TOP)
 
@@ -94,7 +96,7 @@ test = tk.Button(test_frame, font = ft_article, command = Test, text = 'Test')
 test.pack(side = tk.LEFT, padx = 15)
 
 
-# Delete群組
+# Delete
 folders = []
 for name in os.listdir(pj.train_data_path):
         folders.append(name)
@@ -116,4 +118,3 @@ combo_delete.pack(side = tk.LEFT, padx = 17)
 
 
 window.mainloop()
-
